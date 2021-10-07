@@ -10,151 +10,134 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib
 import pandas as pd
-import os
+from tkinter.filedialog import askopenfilename
+from tkinter import Tk
 plt.rcParams.update({'font.size': 12})
-plt.rcParams['figure.figsize'] = 8, 6
+plt.rcParams['figure.figsize'] = 5, 4
 
-folders = paths = [x[1] for x in os.walk(os.getcwd())][0]
-# folders = ['95RW62']
-for folder in folders:
-    sample = folder
-    segment = 'gradual'
-    direc = r'C:\Users\pemar\Documents\FlowersResearch\FRES\Data_processing\HeFTy_modeling\\'
-    file = direc + sample + '\\' + sample + '_' + segment + '-inv.txt'
-    
-    chronometer = direc + sample + '\\' + sample + '_chron.txt'
-    chron_dat = pd.read_csv(chronometer, sep='\t')
-    
-    AHe = chron_dat['AHe'][0]
-    AHe_s = chron_dat['AHe_s'][0]
-    AFT = chron_dat['AFT'][0]
-    AFT_s = chron_dat['AFT_s'][0]
-    ZHe = chron_dat['ZHe'][0]
-    ZHe_s = chron_dat['ZHe_s'][0]
-    ZFT = chron_dat['ZFT'][0]
-    ZFT_s = chron_dat['ZFT_s'][0]
-    
-    # Start by getting meta-info from the header. This can accomodate up to 40 constraint boxes.
-    header = pd.read_csv(file,
-                         sep = '\t',
-                         names = list(range(20)),
-                         nrows = 60)
-    firstcol = header[0].tolist() # Save the row labels to ID the various metadata
-    num_constraints = firstcol.index('Inversion completed')-2 # Count the number of constraints
-    head_length = firstcol.index('Fit')+1 # Find the overall length of the header
-    
-    data_row = header.loc[firstcol.index('Individual paths')+1, :].values.tolist() #find the beginning of the data
-    # The next four lines find how many data inputs there were based on the number of GOF column labels
-    num_data = 0
-    for d in data_row:
-        if type(d) == str:
-            num_data+=1
-    
-    # Use header info to get the constraints
-    constraints = np.genfromtxt(file,
-                                delimiter = '\t',
-                                skip_header = 2,
-                                max_rows = num_constraints,
-                                usecols = (1,2,3,4))
-    
-    # Load the raw data
-    paths_raw = np.genfromtxt(file,
-                              delimiter = '\t',
-                              skip_header = head_length)
-                          
-    # Split the raw data into individual paths as a list of lists
-    # Each path is saved as [GOFs, Times, Temperatures]
-    paths = []
-    for r in range(0,len(paths_raw),2):
-        paths.append([paths_raw[r+1][1:1+num_data],
-                      paths_raw[r][2+num_data:],
-                      paths_raw[r+1][2+num_data:]])
-    
-    # The next six lines take the Goodness of Fit for each path and collapses them to one number using a weighted mean
-    for i in range(len(paths)):
-        paths[i][0] = paths[i][0][~np.isnan(paths[i][0])] # Isolate the GOF numbers
-        weights = [] # Create an empty list for GOF weighting
-        for n in range(len(paths[i][0])):
-            weights.append(1-paths[i][0][n]) # fill weighting list using how far each is from a perfect fit
-        paths[i][0] = np.average(paths[i][0], weights = weights) # Save the newly weighted Goodness of Fit parameter
-    
-    GOFs = [paths[i][0] for i in range(len(paths))] #create a new variable called GOFs using the numbers just generated
-    # The next five lines put the GOFs in order so that they can be plotted with the best-fit paths on top
-    indices = list(range(len(GOFs))) # Create a list of indices for each path
-    indices.sort(key=lambda x: GOFs[x]) # Match the indices to the GOFs
-    zorders = [0] * len(indices) # create an empty list to fill with each index
-    for i, x in enumerate(indices):
-        zorders[x] = i # put the indices in order so that the highest GOF is plotted at the top
-    
-    # Normalize the GOFs from 0-1 so they match the color map
-    normed_GOFs = GOFs### [] # Creaate an empty list
-    ### for GOF in GOFs:
-    ###     normed_GOFs.append((GOF-min(GOFs))/(max(GOFs)-min(GOFs))) # Normalize each and add to the empty list
-    
-    # Create a color map to color the paths based on GOF
-    cmap = matplotlib.cm.get_cmap('viridis') # Create colormap; others exist. See https://matplotlib.org/tutorials/colors/colormaps.html for others you can use.
-    colors = [] # Create an empty list for the color to plot
-    for g in normed_GOFs:
-        colors.append(cmap(g)) # Get the color based on the colormap and weighted normalized GOF value
-    
-    # Plot each path
-    for p in range(0,len(paths)):
-        plt.plot(paths[p][1], paths[p][2], # plot time and temperature
-                 c = colors[p], # use the color determined from the Goodness of Fit
-                 lw = 0.7, # plot a slightly narrower line width so that all are visible
-                 zorder = zorders[p]) # Put the better-fit paths on top
-    
-    # This code block plots the constraint boxes and finds the maximum time and temperate to adjust the axes
-    max_T = 0 # create empty variables for maximum time and temperature to update as constraint boxes are plotted
-    max_t = 0
-    for c in constraints:
-        plt.gca().add_patch(patches.Rectangle((c[1], c[3]),(c[0]-c[1]),(c[2]-c[3]), # plot each constraint as a box
-                            ec = 'k', # make the boxes black
-                            lw = 1, # set the line thickness
-                            fill = False, # prevent the box from being filled
-                            zorder = len(paths)+10)) # Always plot the boxes on top of the paths
-        # The next four lines update the max t and T to set the axes to plot on
-        if c[0]>max_t:
-            max_t = c[0]*1.05
-        if c[2]>max_T:
-            max_T = c[2]*1.05
-    
-    ### ticks = list(np.linspace(min(GOFs), max(GOFs), 6)) # set the non-normalized values as labels on the colorbar
-    normalize = matplotlib.colors.Normalize(0,1)#vmin=min(GOFs), vmax=max(GOFs)) # normalize the colorbar
-    cbar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalize, cmap=cmap), # Plot the colorbar
-                        orientation='vertical', # put colorbar to the right
-                        fraction=.1)###, # set the width of the colorbar
-                        ### ticks = ticks) # relabel the colorbar with the GOF values
-    cbar.set_label('Goodness of Fit (weighted mean)') # Give the colorbar a title
-    ### cbar.set_ticklabels([round(t, 2) for t in ticks]) # round the tick labels so they are at most 2 digits
-    
-    plt.axvline(AHe, lw = 2, color = '#ff7f00', zorder = max(zorders)+10)
-    plt.axvline(AHe-AHe_s, lw = 1, ls = '--', color = '#ff7f00', zorder = max(zorders)+10)
-    plt.axvline(AHe+AHe_s, lw = 1, ls = '--', color = '#ff7f00', zorder = max(zorders)+10)
-    plt.annotate('AHe', xy = (AHe, 0), xycoords = 'data', annotation_clip=False, ha = 'center', va = 'bottom')
-    plt.axvline(AFT, lw = 2, color = '#e41a1c', zorder = max(zorders)+10)
-    plt.axvline(AFT-AFT_s, lw = 1, ls = '--', color = '#e41a1c', zorder = max(zorders)+10)
-    plt.axvline(AFT+AFT_s, lw = 1, ls = '--', color = '#e41a1c', zorder = max(zorders)+10)
-    plt.annotate('AFT', xy = (AFT, 0), xycoords = 'data', annotation_clip=False, ha = 'center', va = 'bottom')
-    plt.axvline(ZHe, lw = 2, color = '#f781bf', zorder = max(zorders)+10)
-    plt.axvline(ZHe-ZHe_s, lw = 1, ls = '--', color = '#f781bf', zorder = max(zorders)+10)
-    plt.axvline(ZHe+ZHe_s, lw = 1, ls = '--', color = '#f781bf', zorder = max(zorders)+10)
-    plt.annotate('ZHe', xy = (ZHe, 0), xycoords = 'data', annotation_clip=False, ha = 'center', va = 'bottom')
-    plt.axvline(ZFT, lw = 2, color = '#d4af37', zorder = max(zorders)+10)
-    plt.axvline(ZFT-ZFT_s, lw = 1, ls = '--', color = '#d4af37', zorder = max(zorders)+10)
-    plt.axvline(ZFT+ZFT_s, lw = 1, ls = '--', color = '#d4af37', zorder = max(zorders)+10)
-    plt.annotate('ZFT', xy = (ZFT, 0), xycoords = 'data', annotation_clip=False, ha = 'center', va = 'bottom')
-    
-    plt.grid(which='major',axis='both', ls = '--') # add a grid to easily trace t-T
-    # plt.title('ADD TITLE HERE') # if you would like a title, delete the first # and add the title
-    plt.xlim(15, 0) # set the x axis limits
-    plt.ylim(200, 0) # set the y axis limits
-    # plt.xlim(max_t, 0)
-    # plt.ylim(max_T, 0)
-    plt.xlabel('Age (Ma)') # label the x axis
-    plt.ylabel('Temperature ($\mathregular{^o}$C)') # label the y axis
-    
-    # plt.show() # show the plot 
-    # plt.tight_layout()
-    plt.savefig(direc+folder+'\\'+folder+'_'+segment+'_zoom_cbarNormed.png', dpi = 500) # this line lets you save the plot if you want (see comment at top for details)
-    plt.clf()
+'''
+This code takes the .txt output from HeFTy (saved by right-clicking on the Time-Temperature history
+and chosing "Export --> Save as Text...") and replots the data using a weighted mean of the goodness
+of fit modeled by HeFTy.
+
+It is meant to be run with only minimal user input: all you need to do is put your file name and
+directory at the very top (lines 31 and 32). Then, to save the plot, uncomment (delete the intial #)
+line XX and put the full file path that you would like to save to. This line is fairly intelligent.
+If you put .jpg, .png, .pdf, etc. it will automatically know what format to save. I have it set up to
+save as a 500 dpi .png right now, which is generaly good enough for publication quality of
+graphical figures.
+
+I've also added commenting throughout so you can understand what is being done. This will also
+hopefully facilitate modifying the code however you see fit to best plot what you want to show.
+'''
+
+# =============================================================================
+# Add your file name and directory here
+# =============================================================================
+root = Tk()
+file = askopenfilename(title = 'Choose file to plot', filetypes = (("Tab-delimited Text file","*.txt"),))
+root.wm_withdraw()
+
+# Start by getting meta-info from the header. This can accomodate up to 40 constraint boxes.
+header = pd.read_csv(file,
+                     sep = '\t',
+                     names = list(range(20)),
+                     nrows = 60)
+firstcol = header[0].tolist() # Save the row labels to ID the various metadata
+num_constraints = firstcol.index('Inversion completed')-2 # Count the number of constraints
+head_length = firstcol.index('Fit')+1 # Find the overall length of the header
+
+data_row = header.loc[firstcol.index('Individual paths')+1, :].values.tolist() #find the beginning of the data
+# Find how many data inputs there were based on the number of GOF column labels
+num_data = 0
+for d in data_row:
+    if type(d) == str:
+        num_data+=1
+
+# Use header info to get the constraints
+constraints = np.genfromtxt(file,
+                            delimiter = '\t',
+                            skip_header = 2,
+                            max_rows = num_constraints,
+                            usecols = (1,2,3,4))
+
+# Load the raw data
+paths_raw = np.genfromtxt(file,
+                          delimiter = '\t',
+                          skip_header = head_length)
+                      
+# Split the raw data into individual paths as a list of lists
+# Each path is saved as [GOFs, Times, Temperatures]
+paths = []
+for r in range(0,len(paths_raw),2):
+    paths.append([paths_raw[r+1][1:1+num_data],
+                  paths_raw[r][2+num_data:],
+                  paths_raw[r+1][2+num_data:]])
+
+# The next six lines take the Goodness of Fit for each path and collapses them to one number using a weighted mean
+for i in range(len(paths)):
+    paths[i][0] = paths[i][0][~np.isnan(paths[i][0])] # Isolate the GOF numbers
+    weights = [] # Create an empty list for GOF weighting
+    for n in range(len(paths[i][0])):
+        weights.append(1-paths[i][0][n]) # fill weighting list using how far each is from a perfect fit
+    paths[i][0] = np.average(paths[i][0], weights = weights) # Save the newly weighted Goodness of Fit parameter
+
+GOFs = [paths[i][0] for i in range(len(paths))] #create a new variable called GOFs using the numbers just generated
+# The next five lines put the GOFs in order so that they can be plotted with the best-fit paths on top
+indices = list(range(len(GOFs))) # Create a list of indices for each path
+indices.sort(key=lambda x: GOFs[x]) # Match the indices to the GOFs
+zorders = [0] * len(indices) # create an empty list to fill with each index
+for i, x in enumerate(indices):
+    zorders[x] = i # put the indices in order so that the highest GOF is plotted at the top
+
+# Normalize the GOFs from 0-1 so they match the color map
+normed_GOFs = [] # Create an empty list
+for GOF in GOFs:
+    normed_GOFs.append((GOF-min(GOFs))/(max(GOFs)-min(GOFs))) # Normalize each and add to the empty list
+
+# Create a color map to color the paths based on GOF
+cmap = matplotlib.cm.get_cmap('viridis') # Create colormap; others exist. See https://matplotlib.org/tutorials/colors/colormaps.html for others you can use.
+colors = [] # Create an empty list for the color to plot
+for g in normed_GOFs:
+    colors.append(cmap(g)) # Get the color based on the colormap and weighted normalized GOF value
+
+# Plot each path
+for p in range(0,len(paths)):
+    plt.plot(paths[p][1], paths[p][2], # plot time and temperature
+             c = colors[p], # use the color determined from the Goodness of Fit
+             lw = 0.7, # plot a slightly narrower line width so that all are visible
+             zorder = zorders[p]) # Put the better-fit paths on top
+
+# This code block plots the constraint boxes and finds the maximum time and temperate to adjust the axes
+max_T = 0 # create empty variables for maximum time and temperature to update as constraint boxes are plotted
+max_t = 0
+for c in constraints:
+    plt.gca().add_patch(patches.Rectangle((c[1], c[3]),(c[0]-c[1]),(c[2]-c[3]), # plot each constraint as a box
+                        ec = 'k', # make the boxes black
+                        lw = 1, # set the line thickness
+                        fill = False, # prevent the box from being filled
+                        zorder = len(paths)+10)) # Always plot the boxes on top of the paths
+    # The next four lines update the max t and T to set the axes to plot on
+    if c[0]>max_t:
+        max_t = c[0]*1.05
+    if c[2]>max_T:
+        max_T = c[2]*1.05
+
+ticks = list(np.linspace(min(GOFs), max(GOFs), 6)) # set the non-normalized values as labels on the colorbar
+normalize = matplotlib.colors.Normalize(vmin=min(GOFs), vmax=max(GOFs)) # normalize the colorbar
+cbar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalize, cmap=cmap), # Plot the colorbar
+                    orientation='vertical', # put colorbar to the right
+                    fraction=.1, # set the width of the colorbar
+                    ticks = ticks) # relabel the colorbar with the GOF values
+cbar.set_label('Goodness of Fit (weighted mean)') # Give the colorbar a title
+cbar.set_ticklabels([round(t, 2) for t in ticks]) # round the tick labels so they are at most 2 digits
+
+plt.grid(which='major',axis='both', ls = '--') # add a grid to easily trace t-T
+# plt.title('ADD TITLE HERE') # if you would like a title, delete the first # and add the title
+plt.xlim(max_t, 0) # set the x axis limits
+plt.ylim(max_T, 0) # set the y axis limits
+plt.xlabel('Age (Ma)') # label the x axis
+plt.ylabel('Temperature ($\mathregular{^o}$C)') # label the y axis
+
+plt.show() # show the plot 
+# plt.savefig(r'C:\Users\FULLDIRECTORY\FILENAME.png', dpi = 500) # this line lets you save the plot if you want (see comment at top for details)
