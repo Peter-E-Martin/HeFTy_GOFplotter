@@ -54,6 +54,25 @@ for d in data_row:
     if type(d) == str:
         num_data+=1
 
+# Get the good-fit envelopes and plot them
+envelope_idx = header.index[header[0] == 'Envelopes'][0]
+envelopes = pd.read_csv(file,
+                        delimiter = '\t',
+                        skiprows = envelope_idx+1,
+                        nrows = 3,
+                        header = None,
+                        index_col = 0).transpose()
+# plt.plot(envelopes['Good Time (Ma)'], envelopes['Good Hi Temp (C)'],
+#          zorder = np.inf, c = 'r', lw = 4)
+# plt.plot(envelopes['Good Time (Ma)'], envelopes['Good Lo Temp (C)'],
+#          zorder = np.inf, c = 'r', lw = 4)
+plt.fill_between(envelopes['Good Time (Ma)'],
+                 envelopes['Good Lo Temp (C)'],
+                 envelopes['Good Hi Temp (C)'],
+                 zorder = -np.inf,
+                 color = 'fuchsia',
+                 alpha = 0.6)
+
 # Use header info to get the constraints
 constraints = np.genfromtxt(file,
                             delimiter = '\t',
@@ -65,7 +84,7 @@ constraints = np.genfromtxt(file,
 paths_raw = np.genfromtxt(file,
                           delimiter = '\t',
                           skip_header = head_length)
-                      
+
 # Split the raw data into individual paths as a list of lists
 # Each path is saved as [GOFs, Times, Temperatures]
 paths = []
@@ -74,7 +93,15 @@ for r in range(0,len(paths_raw),2):
                   paths_raw[r][2+num_data:],
                   paths_raw[r+1][2+num_data:]])
 
-# The next six lines take the Goodness of Fit for each path and collapses them to one number using a weighted mean
+# Find the number of "good" paths, and remove these from those to be
+# plotted using the color ramp
+path_categories = pd.read_csv(file,
+                              delimiter = '\t',
+                              skiprows = head_length-1)
+num_good = int(path_categories['Fit'].str.contains('Good').value_counts()[True]/2+1)
+paths = paths[num_good:]
+
+# Take the Goodness of Fit for each path and collapses them to one number using a weighted mean
 for i in range(len(paths)):
     paths[i][0] = paths[i][0][~np.isnan(paths[i][0])] # Isolate the GOF numbers
     weights = [] # Create an empty list for GOF weighting
@@ -139,5 +166,6 @@ plt.ylim(max_T, 0) # set the y axis limits
 plt.xlabel('Age (Ma)') # label the x axis
 plt.ylabel('Temperature ($\mathregular{^o}$C)') # label the y axis
 
+plt.tight_layout()
 plt.show() # show the plot 
 # plt.savefig(r'C:\Users\FULLDIRECTORY\FILENAME.png', dpi = 500) # this line lets you save the plot if you want (see comment at top for details)
