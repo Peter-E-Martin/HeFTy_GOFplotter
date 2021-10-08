@@ -55,23 +55,23 @@ for d in data_row:
         num_data+=1
 
 # Get the good-fit envelopes and plot them
-envelope_idx = header.index[header[0] == 'Envelopes'][0]
-envelopes = pd.read_csv(file,
-                        delimiter = '\t',
-                        skiprows = envelope_idx+1,
-                        nrows = 3,
-                        header = None,
-                        index_col = 0).transpose()
+# envelope_idx = header.index[header[0] == 'Envelopes'][0]
+# envelopes = pd.read_csv(file,
+#                         delimiter = '\t',
+#                         skiprows = envelope_idx+1,
+#                         nrows = 3,
+#                         header = None,
+#                         index_col = 0).transpose()
 # plt.plot(envelopes['Good Time (Ma)'], envelopes['Good Hi Temp (C)'],
-#          zorder = np.inf, c = 'r', lw = 4)
+#           zorder = np.inf, c = 'coral', lw = 2, ls = '--')
 # plt.plot(envelopes['Good Time (Ma)'], envelopes['Good Lo Temp (C)'],
-#          zorder = np.inf, c = 'r', lw = 4)
-plt.fill_between(envelopes['Good Time (Ma)'],
-                 envelopes['Good Lo Temp (C)'],
-                 envelopes['Good Hi Temp (C)'],
-                 zorder = -np.inf,
-                 color = 'fuchsia',
-                 alpha = 0.6)
+#           zorder = np.inf, c = 'coral', lw = 2, ls = '--')
+# plt.fill_between(envelopes['Good Time (Ma)'],
+#                  envelopes['Good Lo Temp (C)'],
+#                  envelopes['Good Hi Temp (C)'],
+#                  zorder = -np.inf,
+#                  color = 'fuchsia',
+#                  alpha = 0.6)
 
 # Use header info to get the constraints
 constraints = np.genfromtxt(file,
@@ -99,7 +99,7 @@ path_categories = pd.read_csv(file,
                               delimiter = '\t',
                               skiprows = head_length-1)
 num_good = int(path_categories['Fit'].str.contains('Good').value_counts()[True]/2+1)
-paths = paths[num_good:]
+# paths = paths[num_good:]
 
 # Take the Goodness of Fit for each path and collapses them to one number using a weighted mean
 for i in range(len(paths)):
@@ -107,6 +107,8 @@ for i in range(len(paths)):
     weights = [] # Create an empty list for GOF weighting
     for n in range(len(paths[i][0])):
         weights.append(1-paths[i][0][n]) # fill weighting list using how far each is from a perfect fit
+        if sum(weights) == 0:
+            weights = [1 for w in weights]
     paths[i][0] = np.average(paths[i][0], weights = weights) # Save the newly weighted Goodness of Fit parameter
 
 GOFs = [paths[i][0] for i in range(len(paths))] #create a new variable called GOFs using the numbers just generated
@@ -117,10 +119,12 @@ zorders = [0] * len(indices) # create an empty list to fill with each index
 for i, x in enumerate(indices):
     zorders[x] = i # put the indices in order so that the highest GOF is plotted at the top
 
+minimum = 0.05
+maximum = 0.5
 # Normalize the GOFs from 0-1 so they match the color map
 normed_GOFs = [] # Create an empty list
 for GOF in GOFs:
-    normed_GOFs.append((GOF-min(GOFs))/(max(GOFs)-min(GOFs))) # Normalize each and add to the empty list
+    normed_GOFs.append((GOF-minimum)/(maximum-minimum)) # Normalize each and add to the empty list
 
 # Create a color map to color the paths based on GOF
 cmap = matplotlib.cm.get_cmap('viridis') # Create colormap; others exist. See https://matplotlib.org/tutorials/colors/colormaps.html for others you can use.
@@ -150,14 +154,16 @@ for c in constraints:
     if c[2]>max_T:
         max_T = c[2]*1.05
 
-ticks = list(np.linspace(min(GOFs), max(GOFs), 6)) # set the non-normalized values as labels on the colorbar
-normalize = matplotlib.colors.Normalize(vmin=min(GOFs), vmax=max(GOFs)) # normalize the colorbar
+ticks = list(np.linspace(minimum, maximum, 6)) # set the non-normalized values as labels on the colorbar
+normalize = matplotlib.colors.Normalize(vmin=minimum, vmax=maximum) # normalize the colorbar
 cbar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalize, cmap=cmap), # Plot the colorbar
                     orientation='vertical', # put colorbar to the right
                     fraction=.1, # set the width of the colorbar
                     ticks = ticks) # relabel the colorbar with the GOF values
 cbar.set_label('Goodness of Fit (weighted mean)') # Give the colorbar a title
-cbar.set_ticklabels([round(t, 2) for t in ticks]) # round the tick labels so they are at most 2 digits
+ticks = [round(t, 2) for t in ticks]
+ticks[-1] = '≥'+ str(ticks[-1])
+cbar.set_ticklabels(ticks) # round the tick labels so they are at most 2 digits
 
 plt.grid(which='major',axis='both', ls = '--') # add a grid to easily trace t-T
 # plt.title('ADD TITLE HERE') # if you would like a title, delete the first # and add the title
