@@ -5,15 +5,15 @@ Created on Aug 8 2020
 Contact: Peter Martin
 """
 
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib
 import pandas as pd
-from tkinter.filedialog import askopenfilename
+from tkinter.filedialog import askopenfilename, asksaveasfilename
 from tkinter import Tk
 plt.rcParams.update({'font.size': 12})
-plt.rcParams['figure.figsize'] = 5, 4
 
 '''
 This code takes the .txt output from HeFTy (saved by right-clicking on the Time-Temperature history
@@ -38,6 +38,23 @@ root = Tk()
 file = askopenfilename(title = 'Choose file to plot', filetypes = (("Tab-delimited Text file","*.txt"),))
 root.wm_withdraw()
 
+# user-defined variables for plotting
+good_vs_acceptable = True
+save = True
+minimum = 0.05
+maximum = 0.5
+width = 5
+height = 5.5
+
+# Get the name of the file to save if requested
+if save:
+    save_out = asksaveasfilename(title = 'Save file',
+                             defaultextension=".*",
+                             filetypes = (("PNG",".png"),
+                                          ("TIFF",".tiff"),
+                                          ("PDF",".pdf"),
+                                          ("JPEG",".jpg")))
+
 # Start by getting meta-info from the header. This can accomodate up to 40 constraint boxes.
 header = pd.read_csv(file,
                      sep = '\t',
@@ -53,25 +70,6 @@ num_data = 0
 for d in data_row:
     if type(d) == str:
         num_data+=1
-
-# Get the good-fit envelopes and plot them
-# envelope_idx = header.index[header[0] == 'Envelopes'][0]
-# envelopes = pd.read_csv(file,
-#                         delimiter = '\t',
-#                         skiprows = envelope_idx+1,
-#                         nrows = 3,
-#                         header = None,
-#                         index_col = 0).transpose()
-# plt.plot(envelopes['Good Time (Ma)'], envelopes['Good Hi Temp (C)'],
-#           zorder = np.inf, c = 'coral', lw = 2, ls = '--')
-# plt.plot(envelopes['Good Time (Ma)'], envelopes['Good Lo Temp (C)'],
-#           zorder = np.inf, c = 'coral', lw = 2, ls = '--')
-# plt.fill_between(envelopes['Good Time (Ma)'],
-#                  envelopes['Good Lo Temp (C)'],
-#                  envelopes['Good Hi Temp (C)'],
-#                  zorder = -np.inf,
-#                  color = 'fuchsia',
-#                  alpha = 0.6)
 
 # Use header info to get the constraints
 constraints = np.genfromtxt(file,
@@ -119,8 +117,6 @@ zorders = [0] * len(indices) # create an empty list to fill with each index
 for i, x in enumerate(indices):
     zorders[x] = i # put the indices in order so that the highest GOF is plotted at the top
 
-minimum = 0.05
-maximum = 0.5
 # Normalize the GOFs from 0-1 so they match the color map
 normed_GOFs = [] # Create an empty list
 for GOF in GOFs:
@@ -132,22 +128,41 @@ colors = [] # Create an empty list for the color to plot
 for g in normed_GOFs:
     colors.append(cmap(g)) # Get the color based on the colormap and weighted normalized GOF value
 
+# make figure for plotting
+size = (width, height)
+fig, ax = plt.subplots(figsize=size)
+
 # Plot each path
+legend = False
 for p in range(0,len(paths)):
-    plt.plot(paths[p][1], paths[p][2], # plot time and temperature
-             c = colors[p], # use the color determined from the Goodness of Fit
-             lw = 0.7, # plot a slightly narrower line width so that all are visible
-             zorder = zorders[p]) # Put the better-fit paths on top
+    if GOFs[p]>maximum and good_vs_acceptable:
+        if GOFs[p] == max(GOFs):
+            legend = True
+            # add a dummy line to plot the legend
+            ax.plot([-10,-20], [-10,-20], # plot time and temperature
+                      c = 'tab:orange', # use the color determined from the Goodness of Fit #tried firebrick, darkorange, tab:orange
+                      lw = 1.0, # plot a slightly narrower line width so that all are visible
+                      zorder = zorders[p],
+                      label=f'Good Fits\n(GoF >{maximum})') # Put the better-fit paths on top
+        ax.plot(paths[p][1], paths[p][2], # plot time and temperature
+                  c = 'tab:orange', # use the color determined from the Goodness of Fit #tried firebrick, darkorange, tab:orange
+                  lw = 0.3, # plot a slightly narrower line width so that all are visible
+                  zorder = zorders[p]) # Put the better-fit paths on top
+    else:
+        ax.plot(paths[p][1], paths[p][2], # plot time and temperature
+                  c = colors[p], # use the color determined from the Goodness of Fit
+                  lw = 0.3, # plot a slightly narrower line width so that all are visible
+                  zorder = zorders[p]) # Put the better-fit paths on top
 
 # This code block plots the constraint boxes and finds the maximum time and temperate to adjust the axes
 max_T = 0 # create empty variables for maximum time and temperature to update as constraint boxes are plotted
 max_t = 0
 for c in constraints:
-    plt.gca().add_patch(patches.Rectangle((c[1], c[3]),(c[0]-c[1]),(c[2]-c[3]), # plot each constraint as a box
-                        ec = 'k', # make the boxes black
-                        lw = 1, # set the line thickness
-                        fill = False, # prevent the box from being filled
-                        zorder = len(paths)+10)) # Always plot the boxes on top of the paths
+    ax.add_patch(patches.Rectangle((c[1], c[3]),(c[0]-c[1]),(c[2]-c[3]), # plot each constraint as a box
+                      ec = 'k', # make the boxes black
+                      lw = 1, # set the line thickness
+                      fill = False, # prevent the box from being filled
+                      zorder = len(paths)+10)) # Always plot the boxes on top of the paths
     # The next four lines update the max t and T to set the axes to plot on
     if c[0]>max_t:
         max_t = c[0]*1.05
@@ -162,16 +177,20 @@ cbar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalize, cmap=cmap), # P
                     ticks = ticks) # relabel the colorbar with the GOF values
 cbar.set_label('Goodness of Fit (weighted mean)') # Give the colorbar a title
 ticks = [round(t, 2) for t in ticks]
-ticks[-1] = '≥'+ str(ticks[-1])
+if not good_vs_acceptable:
+    ticks[-1] = '≥'+ str(ticks[-1])
 cbar.set_ticklabels(ticks) # round the tick labels so they are at most 2 digits
 
-plt.grid(which='major',axis='both', ls = '--') # add a grid to easily trace t-T
+ax.grid(which='major',axis='both', ls = '--') # add a grid to easily trace t-T
 # plt.title('ADD TITLE HERE') # if you would like a title, delete the first # and add the title
-plt.xlim(max_t, 0) # set the x axis limits
-plt.ylim(max_T, 0) # set the y axis limits
-plt.xlabel('Age (Ma)') # label the x axis
-plt.ylabel('Temperature ($\mathregular{^o}$C)') # label the y axis
+ax.set_xlim(max_t, 0) # set the x axis limits
+ax.set_ylim(max_T, 0) # set the y axis limits
+ax.set_xlabel('Age (Ma)') # label the x axis
+ax.set_ylabel('Temperature ($\mathregular{^o}$C)') # label the y axis
 
+if good_vs_acceptable and legend:
+    plt.legend()
 plt.tight_layout()
-plt.show() # show the plot 
-# plt.savefig(r'C:\Users\FULLDIRECTORY\FILENAME.png', dpi = 500) # this line lets you save the plot if you want (see comment at top for details)
+if save:
+    plt.savefig(save_out, dpi = 800) # this line lets you save the plot if you want
+plt.show() # show the plot
