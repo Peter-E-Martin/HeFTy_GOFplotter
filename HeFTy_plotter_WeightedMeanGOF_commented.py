@@ -40,11 +40,11 @@ root.wm_withdraw()
 
 # user-defined variables for plotting
 good_vs_acceptable = True
-save = True
+save = False
 minimum = 0.05
 maximum = 0.5
-width = 5
-height = 5.5
+width = 6
+height = 5
 
 # Get the name of the file to save if requested
 if save:
@@ -85,19 +85,16 @@ paths_raw = np.genfromtxt(file,
 
 # Split the raw data into individual paths as a list of lists
 # Each path is saved as [GOFs, Times, Temperatures]
+# removes "best fit path" because this is always conained
+# in the paths and should not recieve special treatment
+# within the context of this data presentation
 paths = []
-for r in range(0,len(paths_raw),2):
+dates = []
+for r in range(2,len(paths_raw),2):
     paths.append([paths_raw[r+1][1:1+num_data],
                   paths_raw[r][2+num_data:],
                   paths_raw[r+1][2+num_data:]])
-
-# Find the number of "good" paths, and remove these from those to be
-# plotted using the color ramp
-path_categories = pd.read_csv(file,
-                              delimiter = '\t',
-                              skiprows = head_length-1)
-num_good = int(path_categories['Fit'].str.contains('Good').value_counts()[True]/2+1)
-# paths = paths[num_good:]
+    dates.append(paths_raw[r][1:1+num_data])
 
 # Take the Goodness of Fit for each path and collapses them to one number using a weighted mean
 for i in range(len(paths)):
