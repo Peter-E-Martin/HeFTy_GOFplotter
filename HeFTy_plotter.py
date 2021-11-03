@@ -5,11 +5,10 @@ Created on Aug 8 2020
 Contact: Peter Martin
 """
 
-import os
-import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib
+import numpy as np
 import pandas as pd
 from scipy.stats import combine_pvalues
 from tkinter.filedialog import askopenfilename, asksaveasfilename
@@ -36,8 +35,7 @@ hopefully facilitate modifying the code however you see fit to best plot what yo
 # Add your file name and directory here
 # =============================================================================
 root = Tk()
-# file = askopenfilename(title = 'Choose file to plot', filetypes = (("Tab-delimited Text file","*.txt"),))
-file = r'C:\Users\pemar\desktop\basic_model.txt'
+file = askopenfilename(title = 'Choose file to plot', filetypes = (("Tab-delimited Text file","*.txt"),))
 root.wm_withdraw()
 
 # user-defined variables for plotting
@@ -98,19 +96,10 @@ for r in range(2,len(paths_raw),2):
                   paths_raw[r+1][2+num_data:]])
     dates.append(paths_raw[r][1:1+num_data])
 
-combined = []
+# Use Fisher's method to combine p values into single p value
+# Simply replace the list of GOFs with the combined GOF
 for i in range(len(paths)):
-    paths[i][0] = combine_pvalues(paths[i][0])[1]
-
-# Take the Goodness of Fit for each path and collapses them to one number using a weighted mean
-# for i in range(len(paths)):
-#     paths[i][0] = paths[i][0][~np.isnan(paths[i][0])] # Isolate the GOF numbers
-#     weights = [] # Create an empty list for GOF weighting
-#     for n in range(len(paths[i][0])):
-#         weights.append(1-paths[i][0][n]) # fill weighting list using how far each is from a perfect fit
-#         if sum(weights) == 0:
-#             weights = [1 for w in weights]
-#     paths[i][0] = np.average(paths[i][0], weights = weights) # Save the newly weighted Goodness of Fit parameter
+    paths[i][0] = combine_pvalues(paths[i][0], method='fisher')[1]
 
 GOFs = [paths[i][0] for i in range(len(paths))] #create a new variable called GOFs using the numbers just generated
 # The next five lines put the GOFs in order so that they can be plotted with the best-fit paths on top
@@ -119,8 +108,6 @@ indices.sort(key=lambda x: GOFs[x]) # Match the indices to the GOFs
 zorders = [0] * len(indices) # create an empty list to fill with each index
 for i, x in enumerate(indices):
     zorders[x] = i # put the indices in order so that the highest GOF is plotted at the top
-
-# print([g/c for g,c in zip(GOFs, combined)])
 
 # Normalize the GOFs from 0-1 so they match the color map
 normed_GOFs = [] # Create an empty list
