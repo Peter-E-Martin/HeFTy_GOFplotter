@@ -1,20 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Aug 8 2020
-
-Contact: Peter Martin
-"""
-
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-import matplotlib
-import numpy as np
-import pandas as pd
-from scipy.stats import combine_pvalues
-from tkinter.filedialog import askopenfilename, asksaveasfilename
-from tkinter import Tk
-plt.rcParams.update({'font.size': 12})
-
 '''
 This code takes the .txt output from HeFTy (saved by right-clicking on the Time-Temperature history
 and chosing "Export --> Save as Text...") and replots the data using a weighted mean of the goodness
@@ -29,7 +13,23 @@ graphical figures.
 
 I've also added commenting throughout so you can understand what is being done. This will also
 hopefully facilitate modifying the code however you see fit to best plot what you want to show.
+
+Contact: Peter E. Martin <peter.martin-2@colorado.edu>
 '''
+
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import matplotlib.ticker as ticker
+import matplotlib
+import numpy as np
+import pandas as pd
+from scipy.stats import combine_pvalues
+from tkinter.filedialog import askopenfilename, asksaveasfilename
+from tkinter import Tk
+import random
+plt.rcParams.update({'font.size': 12})
+
+
 
 # =============================================================================
 # Add your file name and directory here
@@ -40,6 +40,7 @@ root.wm_withdraw()
 
 # user-defined variables for plotting
 good_vs_acceptable = True
+emphasize = 40
 save = False
 minimum = 0.05
 maximum = 0.5
@@ -99,7 +100,8 @@ for r in range(2,len(paths_raw),2):
 # Use Fisher's method to combine p values into single p value
 # Simply replace the list of GOFs with the combined GOF
 for i in range(len(paths)):
-    paths[i][0] = combine_pvalues(paths[i][0], method='fisher')[1]
+    paths[i][0] = combine_pvalues(paths[i][0][~np.isnan(paths[i][0])],
+                                  method='fisher')[1]
 
 GOFs = [paths[i][0] for i in range(len(paths))] #create a new variable called GOFs using the numbers just generated
 # The next five lines put the GOFs in order so that they can be plotted with the best-fit paths on top
@@ -124,6 +126,16 @@ for g in normed_GOFs:
 size = (width, height)
 fig, ax = plt.subplots(figsize=size)
 
+if good_vs_acceptable:
+    good_idx = np.where(np.array(GOFs)>maximum)[0]
+    best_idx = GOFs.index(max(GOFs))
+    good_idx = list(np.delete(good_idx, best_idx))
+
+try:
+    emph_idx = random.sample(good_idx, emphasize)
+except ValueError:
+    emph_idx = good_idx
+
 # Plot each path
 legend = False
 for p in range(0,len(paths)):
@@ -136,10 +148,27 @@ for p in range(0,len(paths)):
                       lw = 1.0, # plot a slightly narrower line width so that all are visible
                       zorder = zorders[p],
                       label=f'Good Fits\n(GoF >{maximum})') # Put the better-fit paths on top
-        ax.plot(paths[p][1], paths[p][2], # plot time and temperature
+            if len(emph_idx)>0:
+                ax.plot([-10,-20], [-10,-20], # plot time and temperature
+                          c = '0.35', # use the color determined from the Goodness of Fit #tried firebrick, darkorange, tab:orange
+                          lw = 1.0, # plot a slightly narrower line width so that all are visible
+                          zorder = zorders[p],
+                          label='Randomly-chosen\ngood fits\n(for improved visibility)') # Put the better-fit paths on top
+            ax.plot(paths[p][1], paths[p][2], # plot time and temperature
+                      c = 'k', # use the color determined from the Goodness of Fit #tried firebrick, darkorange, tab:orange
+                      lw = 2, # plot a slightly narrower line width so that all are visible
+                      zorder = zorders[p]*100,
+                      label='Best-fit path') # Put the better-fit paths on top
+        elif p in emph_idx:
+            ax.plot(paths[p][1], paths[p][2], # plot time and temperature
+                  c = '0.35', # use the color determined from the Goodness of Fit #tried firebrick, darkorange, tab:orange
+                  lw = 0.5, # plot a slightly narrower line width so that all are visible
+                  zorder = zorders[p]*100) # emphasize these paths by putting on top
+        else:
+            ax.plot(paths[p][1], paths[p][2], # plot time and temperature
                   c = 'tab:orange', # use the color determined from the Goodness of Fit #tried firebrick, darkorange, tab:orange
-                  lw = 0.3, # plot a slightly narrower line width so that all are visible
-                  zorder = zorders[p]) # Put the better-fit paths on top
+                  lw = 0.5, # plot a slightly narrower line width so that all are visible
+                  zorder = zorders[p]) # Always put the randomly chosen lines on top
     else:
         ax.plot(paths[p][1], paths[p][2], # plot time and temperature
                   c = colors[p], # use the color determined from the Goodness of Fit
@@ -154,7 +183,7 @@ for c in constraints:
                       ec = 'k', # make the boxes black
                       lw = 1, # set the line thickness
                       fill = False, # prevent the box from being filled
-                      zorder = len(paths)+10)) # Always plot the boxes on top of the paths
+                      zorder = len(paths)*100)) # Always plot the boxes on top of the paths
     # The next four lines update the max t and T to set the axes to plot on
     if c[0]>max_t:
         max_t = c[0]*1.05
@@ -175,8 +204,11 @@ cbar.set_ticklabels(ticks) # round the tick labels so they are at most 2 digits
 
 ax.grid(which='major',axis='both', ls = '--') # add a grid to easily trace t-T
 # plt.title('ADD TITLE HERE') # if you would like a title, delete the first # and add the title
-ax.set_xlim(max_t, 0) # set the x axis limits
+# ax.set_xlim(max_t, 0) # set the x axis limits
+ax.set_xlim(100, 0)
 ax.set_ylim(max_T, 0) # set the y axis limits
+ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
+ax.yaxis.set_major_locator(ticker.MultipleLocator(20))
 ax.set_xlabel('Age (Ma)') # label the x axis
 ax.set_ylabel('Temperature ($\mathregular{^o}$C)') # label the y axis
 
