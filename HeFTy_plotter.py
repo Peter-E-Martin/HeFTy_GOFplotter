@@ -58,16 +58,16 @@ if save:
 
 # Start by getting meta-info from the header. This can accomodate up to 40 constraint boxes.
 header = pd.read_csv(file,
-                     sep = '\t',
-                     names = list(range(20)),
                      nrows = 60)
+header = header['Constraints'].str.split('\t', n=20, expand=True)
 firstcol = header[0].tolist() # Save the row labels to ID the various metadata
-num_constraints = firstcol.index('Inversion completed')-2 # Count the number of constraints
+num_constraints = firstcol.index('Inversion completed')-1 # Count the number of constraints
 head_length = firstcol.index('Fit')+1 # Find the overall length of the header
 
 data_row = header.loc[firstcol.index('Individual paths')+1, :].values.tolist() #find the beginning of the data
 # Find how many data inputs there were based on the number of GOF column labels
-num_data = 0
+# Starts with -1 because empty first column is always read as an empty string
+num_data = -1
 for d in data_row:
     if type(d) == str:
         num_data+=1
@@ -91,7 +91,7 @@ paths_raw = np.genfromtxt(file,
 # within the context of this data presentation
 paths = []
 dates = []
-for r in range(2,len(paths_raw),2):
+for r in range(3,len(paths_raw),2):
     paths.append([paths_raw[r+1][1:1+num_data],
                   paths_raw[r][2+num_data:],
                   paths_raw[r+1][2+num_data:]])
@@ -205,7 +205,7 @@ cbar.set_ticklabels(ticks) # round the tick labels so they are at most 2 digits
 ax.grid(which='major',axis='both', ls = '--') # add a grid to easily trace t-T
 # plt.title('ADD TITLE HERE') # if you would like a title, delete the first # and add the title
 # ax.set_xlim(max_t, 0) # set the x axis limits
-ax.set_xlim(100, 0)
+ax.set_xlim(50, 0)
 ax.set_ylim(max_T, 0) # set the y axis limits
 ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
 ax.yaxis.set_major_locator(ticker.MultipleLocator(20))
