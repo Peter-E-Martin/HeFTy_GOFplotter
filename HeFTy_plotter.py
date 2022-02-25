@@ -40,7 +40,7 @@ root.wm_withdraw()
 
 # user-defined variables for plotting
 good_vs_acceptable = True
-emphasize = 40
+emphasize = 0
 save = False
 minimum = 0.05
 maximum = 0.5
@@ -136,6 +136,7 @@ try:
 except ValueError:
     emph_idx = good_idx
 
+
 # Plot each path
 legend = False
 for p in range(0,len(paths)):
@@ -208,7 +209,7 @@ ax.grid(which='major',axis='both', ls = '--') # add a grid to easily trace t-T
 ax.set_xlim(50, 0)
 ax.set_ylim(max_T, 0) # set the y axis limits
 ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
-ax.yaxis.set_major_locator(ticker.MultipleLocator(20))
+ax.yaxis.set_major_locator(ticker.MultipleLocator(50))
 ax.set_xlabel('Age (Ma)') # label the x axis
 ax.set_ylabel('Temperature ($\mathregular{^o}$C)') # label the y axis
 
