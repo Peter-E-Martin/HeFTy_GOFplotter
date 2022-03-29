@@ -26,7 +26,6 @@ import pandas as pd
 from scipy.stats import combine_pvalues
 from tkinter.filedialog import askopenfilename, asksaveasfilename
 from tkinter import Tk
-import random
 plt.rcParams.update({'font.size': 12})
 
 
@@ -129,10 +128,11 @@ fig, ax = plt.subplots(figsize=size)
 if good_vs_acceptable:
     good_idx = np.where(np.array(GOFs)>maximum)[0]
     best_idx = GOFs.index(max(GOFs))
-    good_idx = list(np.delete(good_idx, best_idx))
+    if len(good_idx)>0:
+        good_idx = list(np.delete(good_idx, best_idx))
 
 try:
-    emph_idx = random.sample(good_idx, emphasize)
+    emph_idx = np.random.choice(good_idx, emphasize)
 except ValueError:
     emph_idx = good_idx
 
